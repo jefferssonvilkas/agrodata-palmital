@@ -1,395 +1,761 @@
 import streamlit as st
 import anthropic
 import random
+import plotly.graph_objects as go
+import plotly.express as px
 from datetime import date, timedelta
 
-# ── Config da página ─────────────────────────────────────────
+# ── Página ───────────────────────────────────────────────────
 st.set_page_config(
     page_title="AgroData Palmital",
-    page_icon="🌱",
+    page_icon="🌿",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-# ── CSS customizado ──────────────────────────────────────────
+# ── CSS Global ───────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;1,300&family=DM+Sans:wght@300;400;500&display=swap');
 
-html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
+/* Reset geral */
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+    color: #1c1a16;
+}
+.main { background: #f5f2eb; }
+.block-container { padding: 0 !important; max-width: 100% !important; }
 
-.main { background-color: #f7f5f0; }
-.block-container { padding: 2rem 2.5rem 2rem 2.5rem; max-width: 1100px; }
+/* Esconde elementos padrão do streamlit */
+#MainMenu, footer, header { visibility: hidden; }
+.stDeployButton { display: none; }
+[data-testid="stSidebar"] { display: none; }
 
-.brand-header {
-    background: #1a3a2a;
-    color: #e8f0e0;
-    padding: 1.5rem 2rem;
-    border-radius: 16px;
-    margin-bottom: 1.5rem;
+/* ── LOGIN ── */
+.login-wrap {
+    min-height: 100vh;
+    background: #1a2e1f;
     display: flex;
     align-items: center;
-    gap: 1rem;
+    justify-content: center;
+    padding: 2rem;
 }
-.brand-title {
-    font-family: 'DM Serif Display', serif;
-    font-size: 1.9rem;
-    color: #c8e6c0;
-    margin: 0;
+.login-box {
+    background: #f5f2eb;
+    border-radius: 24px;
+    padding: 3rem 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
+}
+.login-logo {
+    font-family: 'Fraunces', serif;
+    font-size: 2.2rem;
+    font-weight: 300;
+    color: #1a2e1f;
     line-height: 1.1;
-}
-.brand-sub {
-    font-size: 0.82rem;
-    color: #8ab89a;
-    margin: 0;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
-.metric-card {
-    background: white;
-    border: 1px solid #e0ddd5;
-    border-radius: 14px;
-    padding: 1.1rem 1.2rem;
-    margin-bottom: 0.7rem;
-}
-.metric-label {
-    font-size: 0.72rem;
-    color: #8a8880;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
     margin-bottom: 0.3rem;
 }
-.metric-value {
-    font-size: 1.55rem;
-    font-weight: 600;
-    color: #1a3a2a;
-    line-height: 1.1;
+.login-sub {
+    font-size: 0.78rem;
+    color: #8a8575;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 2.5rem;
 }
-.metric-delta-up   { font-size: 0.78rem; color: #2d7a4f; font-weight: 500; }
-.metric-delta-down { font-size: 0.78rem; color: #b84040; font-weight: 500; }
-.metric-unit { font-size: 0.75rem; color: #aaa; margin-left: 3px; }
+.login-field label {
+    font-size: 0.78rem !important;
+    color: #8a8575 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
 
-.chat-msg-user {
-    background: #1a3a2a;
+/* ── TOPO / NAV ── */
+.topbar {
+    background: #1a2e1f;
+    padding: 0 2.5rem;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.topbar-brand {
+    font-family: 'Fraunces', serif;
+    font-size: 1.35rem;
+    font-weight: 300;
+    color: #c8ddc0;
+    letter-spacing: 0.02em;
+}
+.topbar-farm {
+    font-size: 0.78rem;
+    color: #7a9e7e;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+.topbar-user {
+    font-size: 0.82rem;
+    color: #a8c4aa;
+}
+.topbar-date {
+    font-size: 0.78rem;
+    color: #5a7a5e;
+}
+
+/* ── HERO STRIP ── */
+.hero-strip {
+    background: #2d4a32;
+    padding: 2rem 2.5rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.hero-kpi {
+    flex: 1;
+    min-width: 160px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 1.2rem 1.4rem;
+}
+.hero-kpi-label {
+    font-size: 0.7rem;
+    color: #7a9e7e;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.4rem;
+}
+.hero-kpi-val {
+    font-family: 'Fraunces', serif;
+    font-size: 2rem;
+    font-weight: 300;
     color: #e8f0e0;
-    padding: 0.75rem 1rem;
-    border-radius: 14px 14px 4px 14px;
-    margin: 0.5rem 0 0.5rem 3rem;
-    font-size: 0.9rem;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+}
+.hero-kpi-unit {
+    font-size: 0.72rem;
+    color: #7a9e7e;
+}
+.hero-kpi-delta-up   { font-size: 0.78rem; color: #7dd88a; font-weight: 500; }
+.hero-kpi-delta-down { font-size: 0.78rem; color: #e87a7a; font-weight: 500; }
+
+/* ── PÁGINA CONTENT ── */
+.page-content {
+    padding: 2rem 2.5rem;
+    background: #f5f2eb;
+    min-height: calc(100vh - 64px - 120px);
+}
+
+/* ── CARDS ── */
+.card {
+    background: white;
+    border: 1px solid #e8e4db;
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 1.2rem;
+    height: 100%;
+}
+.card-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1.05rem;
+    font-weight: 400;
+    color: #1a2e1f;
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid #f0ece3;
+}
+
+/* ── TALHOES ── */
+.talhao-row {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f5f2eb;
+    gap: 1rem;
+}
+.talhao-color {
+    width: 10px;
+    height: 36px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+.talhao-info { flex: 1; }
+.talhao-name { font-size: 0.88rem; font-weight: 500; color: #1c1a16; }
+.talhao-sub  { font-size: 0.75rem; color: #8a8575; margin-top: 1px; }
+.talhao-val  { text-align: right; }
+.talhao-num  { font-size: 1rem; font-weight: 500; color: #1a2e1f; }
+.talhao-unit { font-size: 0.72rem; color: #8a8575; }
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+.badge-green  { background: #e8f5e0; color: #2d6a2e; }
+.badge-yellow { background: #fdf5e0; color: #8a6a10; }
+.badge-blue   { background: #e0edf5; color: #1a4a6e; }
+.badge-gray   { background: #f0ede8; color: #6a6560; }
+
+/* ── ALERTAS ── */
+.alert-item {
+    display: flex;
+    gap: 0.8rem;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid #f5f2eb;
+    align-items: flex-start;
+}
+.alert-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+}
+.alert-text  { font-size: 0.85rem; color: #3a3830; line-height: 1.5; flex: 1; }
+.alert-time  { font-size: 0.72rem; color: #aaa89f; white-space: nowrap; }
+
+/* ── CHAT ── */
+.chat-history {
+    height: 360px;
+    overflow-y: auto;
+    padding: 0.5rem 0;
+    margin-bottom: 0.8rem;
+}
+.chat-bubble-user {
+    background: #1a2e1f;
+    color: #e8f0e0;
+    padding: 0.65rem 1rem;
+    border-radius: 16px 16px 4px 16px;
+    margin: 0.4rem 0 0.4rem 2.5rem;
+    font-size: 0.87rem;
     line-height: 1.5;
 }
-.chat-msg-ai {
-    background: white;
-    border: 1px solid #e0ddd5;
-    color: #2a2a25;
-    padding: 0.75rem 1rem;
-    border-radius: 14px 14px 14px 4px;
-    margin: 0.5rem 3rem 0.5rem 0;
-    font-size: 0.9rem;
+.chat-bubble-ai {
+    background: #f5f2eb;
+    border: 1px solid #e8e4db;
+    color: #1c1a16;
+    padding: 0.65rem 1rem;
+    border-radius: 16px 16px 16px 4px;
+    margin: 0.4rem 2.5rem 0.4rem 0;
+    font-size: 0.87rem;
     line-height: 1.6;
 }
-.chat-label-user { text-align: right; font-size: 0.7rem; color: #8a8880; margin-bottom: 2px; }
-.chat-label-ai   { font-size: 0.7rem; color: #8a8880; margin-bottom: 2px; }
-
-.alert-card {
-    background: #fffbf0;
-    border-left: 4px solid #d4a017;
-    border-radius: 0 12px 12px 0;
-    padding: 0.9rem 1.1rem;
-    margin-bottom: 0.6rem;
-    font-size: 0.88rem;
-    color: #3a3020;
-    line-height: 1.5;
-}
-.alert-card.green {
-    background: #f0f7f2;
-    border-left-color: #2d7a4f;
-    color: #1a3a2a;
-}
-.section-title {
-    font-family: 'DM Serif Display', serif;
-    font-size: 1.15rem;
-    color: #1a3a2a;
-    margin: 1.2rem 0 0.7rem 0;
-}
-.farm-badge {
+.chat-name-user { text-align:right; font-size:0.68rem; color:#aaa89f; margin-bottom:2px; }
+.chat-name-ai   { font-size:0.68rem; color:#aaa89f; margin-bottom:2px; }
+.chip {
     display: inline-block;
-    background: #e8f0e0;
-    color: #1a3a2a;
+    background: #f0ece3;
+    border: 1px solid #e0dbd0;
     border-radius: 20px;
-    padding: 3px 12px;
+    padding: 5px 12px;
     font-size: 0.78rem;
-    font-weight: 500;
-    margin: 2px;
+    color: #3a3830;
+    margin: 3px;
+    cursor: pointer;
 }
-.sidebar-section {
-    background: white;
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 0.8rem;
-    border: 1px solid #e8e5de;
+
+/* Ajustes streamlit nativos */
+div[data-testid="stChatInput"] > div {
+    border-radius: 14px !important;
+    background: white !important;
+    border: 1px solid #e0dbd0 !important;
 }
-div[data-testid="stChatInput"] textarea {
-    border-radius: 12px !important;
-    border-color: #c8c5be !important;
+.stButton button {
+    border-radius: 10px !important;
+    border: 1px solid #d8d4cb !important;
+    background: white !important;
+    color: #3a3830 !important;
+    font-size: 0.82rem !important;
+    padding: 0.3rem 0.8rem !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Dados simulados (MVP sem banco) ─────────────────────────
-@st.cache_data(ttl=3600)
-def get_market_data():
-    """Simula dados de mercado — substituir por API real no futuro."""
-    today = date.today()
-    random.seed(today.toordinal())
-
-    def price_series(base, vol=0.015):
-        series = []
-        p = base
-        for i in range(14):
-            p = round(p * (1 + random.uniform(-vol, vol * 1.2)), 2)
-            series.append(p)
-        return series
-
-    soja  = price_series(152.0)
-    milho = price_series(78.5)
-    cana  = price_series(111.0)
-
+# ── Dados mockados ────────────────────────────────────────────
+def gerar_precos(seed_offset=0):
+    hoje = date.today()
+    random.seed(hoje.toordinal() + seed_offset)
+    def serie(base, dias=30, vol=0.012):
+        p, s = base, []
+        for _ in range(dias):
+            p = round(p * (1 + random.uniform(-vol, vol * 1.3)), 2)
+            s.append(p)
+        return s
+    soja  = serie(152.0)
+    milho = serie(78.5)
+    cana  = serie(111.0)
     return {
-        "soja":  {"atual": soja[-1],  "ontem": soja[-2],  "serie": soja,  "unidade": "sc 60kg"},
-        "milho": {"atual": milho[-1], "ontem": milho[-2], "serie": milho, "unidade": "sc 60kg"},
-        "cana":  {"atual": cana[-1],  "ontem": cana[-2],  "serie": cana,  "unidade": "tonelada"},
+        "soja":  {"atual": soja[-1],  "ontem": soja[-2],  "serie": soja,  "un": "sc 60kg"},
+        "milho": {"atual": milho[-1], "ontem": milho[-2], "serie": milho, "un": "sc 60kg"},
+        "cana":  {"atual": cana[-1],  "ontem": cana[-2],  "serie": cana,  "un": "ton"},
     }
 
-@st.cache_data(ttl=3600)
-def get_weather():
-    today = date.today()
-    random.seed(today.toordinal() + 99)
-    month = today.month
-    is_summer = month in (11, 12, 1, 2, 3)
+def gerar_talhoes(crops):
+    cores = {"Soja": "#4a8c3f", "Milho": "#c8a020", "Cana": "#4a7a9b", "Mandioca": "#9b6a3e"}
+    status_opts = ["Crescimento", "Plantio", "Colheita", "Preparo"]
+    talhoes = []
+    random.seed(date.today().toordinal() + 7)
+    for i, crop in enumerate(crops * 3):
+        talhoes.append({
+            "nome": f"Talhão {i+1} — {crop}",
+            "cultura": crop,
+            "cor": cores.get(crop, "#888"),
+            "ha": round(random.uniform(12, 45), 1),
+            "prod_est": round(random.uniform(48, 72) if crop == "Soja"
+                              else random.uniform(90, 130) if crop == "Milho"
+                              else random.uniform(75, 95), 1),
+            "status": random.choice(status_opts),
+            "dias": random.randint(18, 95),
+        })
+    return talhoes[:6]
+
+def gerar_producao_mensal(crops):
+    meses = ["Set", "Out", "Nov", "Dez", "Jan", "Fev", "Mar"]
+    random.seed(42)
+    result = {}
+    for crop in crops:
+        base = 150 if crop == "Soja" else 80 if crop == "Milho" else 110
+        result[crop] = [round(base * random.uniform(0.85, 1.2)) for _ in meses]
+    return meses, result
+
+def gerar_clima():
+    random.seed(date.today().toordinal() + 3)
+    m = date.today().month
+    verao = m in (11, 12, 1, 2, 3)
     return {
-        "temp_max": round(random.uniform(28, 36) if is_summer else random.uniform(22, 30), 1),
-        "temp_min": round(random.uniform(18, 23) if is_summer else random.uniform(11, 17), 1),
-        "rain_mm":  round(random.uniform(0, 20)  if is_summer else random.uniform(0, 4), 1),
-        "humidity": round(random.uniform(60, 85)  if is_summer else random.uniform(45, 70), 0),
-        "previsao": "Chuva à tarde" if is_summer and random.random() > 0.5 else "Sol com poucas nuvens",
+        "max": round(random.uniform(29, 36) if verao else random.uniform(23, 30), 1),
+        "min": round(random.uniform(19, 24) if verao else random.uniform(12, 18), 1),
+        "chuva": round(random.uniform(0, 18) if verao else random.uniform(0, 4), 1),
+        "umidade": round(random.uniform(62, 85) if verao else random.uniform(45, 65)),
+        "prev": "Chuva à tarde" if verao and random.random() > 0.45 else "Sol com poucas nuvens",
     }
 
-FAZENDAS = [
-    {"nome": "Fazenda São João",  "produtor": "João Silva",   "ha": 120, "culturas": ["Soja", "Milho"]},
-    {"nome": "Sítio Boa Vista",   "produtor": "Maria Santos", "ha": 45,  "culturas": ["Cana", "Milho"]},
-    {"nome": "Fazenda Três Irmãs","produtor": "Carlos Mendes","ha": 210, "culturas": ["Soja", "Cana"]},
+ALERTAS = [
+    {"cor": "#4a8c3f", "texto": "Soja em alta por 3 dias consecutivos — janela favorável para venda.", "hora": "08:14"},
+    {"cor": "#c8a020", "texto": "Umidade do solo no Talhão 3 abaixo do ideal — considerar irrigação.", "hora": "07:30"},
+    {"cor": "#4a7a9b", "texto": "Previsão de chuva forte para quinta-feira — adiar aplicação de defensivo.", "hora": "Ontem"},
+    {"cor": "#c84040", "texto": "Preço do milho recuou 1,8% esta semana. Acompanhar mercado.", "hora": "Ontem"},
 ]
 
-# ── Estado da sessão ─────────────────────────────────────────
+# ── Autenticação ─────────────────────────────────────────────
+def check_login(username, password):
+    try:
+        users = st.secrets.get("users", {})
+        user_data = users.get(username)
+        if user_data and user_data.get("password") == password:
+            return dict(user_data)
+    except Exception:
+        pass
+    # Fallback demo (para quando não há secrets configurados)
+    DEMO = {
+        "joao":   {"password": "senha123", "farm": "Fazenda São João",   "owner": "João Silva",   "hectares": 120, "crops": ["Soja", "Milho"], "city": "Palmital"},
+        "maria":  {"password": "senha456", "farm": "Sítio Boa Vista",    "owner": "Maria Santos", "hectares": 45,  "crops": ["Cana", "Milho"], "city": "Palmital"},
+        "carlos": {"password": "senha789", "farm": "Fazenda Três Irmãs", "owner": "Carlos Mendes","hectares": 210, "crops": ["Soja", "Cana"],  "city": "Palmital"},
+    }
+    u = DEMO.get(username.lower())
+    if u and u["password"] == password:
+        return u
+    return None
+
+def get_api_key():
+    try:
+        return st.secrets.get("ANTHROPIC_API_KEY", "")
+    except Exception:
+        return ""
+
+# ── Estado ───────────────────────────────────────────────────
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "farm_idx" not in st.session_state:
-    st.session_state.farm_idx = 0
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = "dashboard"
 
-# ── Sidebar ──────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("### AgroData Palmital")
-    st.markdown("---")
-
-    api_key = st.text_input(
-        "Chave API Claude",
-        type="password",
-        help="Obtenha em console.anthropic.com",
-        placeholder="sk-ant-...",
-    )
-
-    st.markdown("**Fazenda selecionada**")
-    farm_names = [f["nome"] for f in FAZENDAS]
-    selected = st.selectbox("", farm_names, label_visibility="collapsed")
-    farm = FAZENDAS[farm_names.index(selected)]
-
-    st.markdown(f"""
-    <div class="sidebar-section">
-        <div style="font-size:0.8rem;color:#8a8880;margin-bottom:6px">PRODUTOR</div>
-        <div style="font-weight:500;color:#1a3a2a">{farm['produtor']}</div>
-        <div style="font-size:0.82rem;color:#666;margin-top:4px">{farm['ha']} hectares</div>
-        <div style="margin-top:8px">
-            {''.join(f'<span class="farm-badge">{c}</span>' for c in farm['culturas'])}
+# ════════════════════════════════════════════════════════════
+# TELA DE LOGIN
+# ════════════════════════════════════════════════════════════
+if not st.session_state.logged_in:
+    st.markdown("""
+    <div style="min-height:100vh;background:#1a2e1f;display:flex;
+        align-items:center;justify-content:center;padding:2rem;">
+      <div style="background:#f5f2eb;border-radius:28px;padding:3rem 2.5rem;
+          width:100%;max-width:400px;text-align:center;">
+        <div style="font-family:'Fraunces',serif;font-size:2.4rem;
+            font-weight:300;color:#1a2e1f;line-height:1.1;margin-bottom:0.3rem;">
+          AgroData
         </div>
+        <div style="font-size:0.75rem;color:#8a8575;letter-spacing:0.14em;
+            text-transform:uppercase;margin-bottom:0.5rem;">
+          Palmital · SP
+        </div>
+        <div style="width:40px;height:2px;background:#4a8c3f;
+            margin:0 auto 2.2rem;border-radius:2px;"></div>
+        <div style="font-size:0.82rem;color:#6a6560;margin-bottom:2rem;">
+          Inteligência de dados para o produtor rural
+        </div>
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("**Perguntas rápidas**")
-    quick_questions = [
-        "Vale vender soja essa semana?",
-        "Previsão de chuva afeta o plantio?",
-        "Como está o preço do milho?",
-        "Qual a margem atual por hectare?",
-        "Devo esperar mais para vender?",
-    ]
-    for q in quick_questions:
-        if st.button(q, use_container_width=True, key=f"q_{q[:10]}"):
-            st.session_state._quick_q = q
+    # Centraliza o formulário
+    col1, col2, col3 = st.columns([1, 1.2, 1])
+    with col2:
+        st.markdown("<div style='margin-top:-420px;'>", unsafe_allow_html=True)
+        with st.form("login_form"):
+            st.markdown("<div style='height:200px'></div>", unsafe_allow_html=True)
+            username = st.text_input("Usuário", placeholder="joao", key="login_user")
+            password = st.text_input("Senha", type="password", placeholder="••••••••", key="login_pass")
+            st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+            submitted = st.form_submit_button("Entrar", use_container_width=True)
 
-    if st.button("🗑 Limpar conversa", use_container_width=True):
-        st.session_state.messages = []
+            if submitted:
+                user_data = check_login(username, password)
+                if user_data:
+                    st.session_state.logged_in = True
+                    st.session_state.user = user_data
+                    st.session_state.username = username
+                    st.session_state.messages = []
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha incorretos.")
+
+        st.markdown("""
+        <div style='text-align:center;font-size:0.75rem;color:#aaa89f;margin-top:1rem;'>
+            Demo: joao / senha123 &nbsp;·&nbsp; maria / senha456
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.stop()
+
+# ════════════════════════════════════════════════════════════
+# DASHBOARD (pós-login)
+# ════════════════════════════════════════════════════════════
+user    = st.session_state.user
+crops   = user["crops"]
+farm    = user["farm"]
+owner   = user["owner"]
+hectares= user["hectares"]
+
+precos  = gerar_precos()
+talhoes = gerar_talhoes(crops)
+clima   = gerar_clima()
+meses, prod_mensal = gerar_producao_mensal(crops)
+api_key = get_api_key()
+
+hoje_str = date.today().strftime("%d de %B de %Y").replace(
+    "January","janeiro").replace("February","fevereiro").replace("March","março"
+    ).replace("April","abril").replace("May","maio").replace("June","junho"
+    ).replace("July","julho").replace("August","agosto").replace("September","setembro"
+    ).replace("October","outubro").replace("November","novembro").replace("December","dezembro")
+
+# ── Topbar ───────────────────────────────────────────────────
+c_logout = st.columns([6,1])
+with c_logout[1]:
+    if st.button("Sair", key="logout_btn"):
+        st.session_state.logged_in = False
         st.rerun()
 
-# ── Cabeçalho ────────────────────────────────────────────────
-st.markdown("""
-<div class="brand-header">
-    <div>
-        <p class="brand-title">AgroData Palmital</p>
-        <p class="brand-sub">Inteligência de dados para o produtor rural · MVP</p>
+st.markdown(f"""
+<div class="topbar">
+  <div>
+    <div class="topbar-brand">AgroData Palmital</div>
+    <div class="topbar-farm">{farm}</div>
+  </div>
+  <div class="topbar-right">
+    <div style="text-align:right">
+      <div class="topbar-user">{owner}</div>
+      <div class="topbar-date">{hoje_str}</div>
     </div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── Layout principal ─────────────────────────────────────────
-col_dados, col_chat = st.columns([1, 1.4], gap="large")
+# ── KPI Hero ─────────────────────────────────────────────────
+def delta_html(atual, ontem, cls_base="hero-kpi-delta"):
+    d = atual - ontem
+    pct = d / ontem * 100
+    arrow = "▲" if d >= 0 else "▼"
+    cls = f"{cls_base}-up" if d >= 0 else f"{cls_base}-down"
+    return f'<span class="{cls}">{arrow} {abs(d):.2f} ({pct:+.1f}%)</span>'
 
-# ── Coluna esquerda: dados ───────────────────────────────────
-with col_dados:
-    market = get_market_data()
-    weather = get_weather()
+soja_d  = delta_html(precos["soja"]["atual"],  precos["soja"]["ontem"])
+milho_d = delta_html(precos["milho"]["atual"], precos["milho"]["ontem"])
+cana_d  = delta_html(precos["cana"]["atual"],  precos["cana"]["ontem"])
 
-    st.markdown('<div class="section-title">Mercado hoje</div>', unsafe_allow_html=True)
+st.markdown(f"""
+<div class="hero-strip">
+  <div class="hero-kpi">
+    <div class="hero-kpi-label">Soja · CEPEA</div>
+    <div class="hero-kpi-val">R$ {precos['soja']['atual']:.2f}</div>
+    <div class="hero-kpi-unit">{precos['soja']['un']}</div>
+    {soja_d}
+  </div>
+  <div class="hero-kpi">
+    <div class="hero-kpi-label">Milho · CEPEA</div>
+    <div class="hero-kpi-val">R$ {precos['milho']['atual']:.2f}</div>
+    <div class="hero-kpi-unit">{precos['milho']['un']}</div>
+    {milho_d}
+  </div>
+  <div class="hero-kpi">
+    <div class="hero-kpi-label">Cana · CEPEA</div>
+    <div class="hero-kpi-val">R$ {precos['cana']['atual']:.2f}</div>
+    <div class="hero-kpi-unit">{precos['cana']['un']}</div>
+    {cana_d}
+  </div>
+  <div class="hero-kpi">
+    <div class="hero-kpi-label">Clima · Palmital</div>
+    <div class="hero-kpi-val">{clima['max']}°</div>
+    <div class="hero-kpi-unit">máx · {clima['min']}° mín</div>
+    <span style="font-size:0.75rem;color:#a8c4aa">{clima['chuva']}mm · {clima['prev']}</span>
+  </div>
+  <div class="hero-kpi">
+    <div class="hero-kpi-label">Área total</div>
+    <div class="hero-kpi-val">{hectares}</div>
+    <div class="hero-kpi-unit">hectares</div>
+    <span style="font-size:0.75rem;color:#a8c4aa">{', '.join(crops)}</span>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
-    for commodity, info in market.items():
-        delta = info["atual"] - info["ontem"]
-        delta_pct = (delta / info["ontem"]) * 100
-        arrow = "▲" if delta >= 0 else "▼"
-        delta_cls = "metric-delta-up" if delta >= 0 else "metric-delta-down"
+# ── Conteúdo ─────────────────────────────────────────────────
+st.markdown('<div class="page-content">', unsafe_allow_html=True)
+
+col_esq, col_dir = st.columns([1.1, 1], gap="large")
+
+# ════ COLUNA ESQUERDA ════
+with col_esq:
+
+    # Gráfico de preços
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">Evolução de preços — 30 dias</div>', unsafe_allow_html=True)
+
+    dias = [(date.today() - timedelta(days=29-i)).strftime("%d/%m") for i in range(30)]
+    fig = go.Figure()
+    cores_linha = {"soja": "#4a8c3f", "milho": "#c8a020", "cana": "#4a7a9b"}
+    for nome, info in precos.items():
+        if any(c.lower() == nome or
+               (nome == "cana" and "Cana" in crops) or
+               (nome == "soja" and "Soja" in crops) or
+               (nome == "milho" and "Milho" in crops)
+               for c in crops):
+            fig.add_trace(go.Scatter(
+                x=dias, y=info["serie"],
+                name=nome.capitalize(),
+                line=dict(color=cores_linha[nome], width=2.5),
+                mode="lines",
+            ))
+
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=0, r=0, t=10, b=0),
+        height=220,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                    font=dict(size=11, color="#6a6560")),
+        xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#aaa89f"),
+                   tickmode="array",
+                   tickvals=dias[::5], ticktext=dias[::5]),
+        yaxis=dict(showgrid=True, gridcolor="#f0ece3",
+                   tickfont=dict(size=10, color="#aaa89f"),
+                   tickprefix="R$ "),
+        font=dict(family="DM Sans"),
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Talhões
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">Talhões · situação atual</div>', unsafe_allow_html=True)
+
+    status_badge = {
+        "Crescimento": "badge-green",
+        "Plantio":     "badge-blue",
+        "Colheita":    "badge-yellow",
+        "Preparo":     "badge-gray",
+    }
+    for t in talhoes:
+        badge_cls = status_badge.get(t["status"], "badge-gray")
         st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">{commodity.upper()} · CEPEA/ESALQ</div>
-            <div class="metric-value">R$ {info['atual']:.2f}<span class="metric-unit">/{info['unidade']}</span></div>
-            <div class="{delta_cls}">{arrow} R$ {abs(delta):.2f} ({delta_pct:+.1f}% hoje)</div>
+        <div class="talhao-row">
+          <div class="talhao-color" style="background:{t['cor']}"></div>
+          <div class="talhao-info">
+            <div class="talhao-name">{t['nome']}</div>
+            <div class="talhao-sub">{t['ha']} ha · {t['dias']} dias de ciclo</div>
+          </div>
+          <div style="text-align:right">
+            <div><span class="badge {badge_cls}">{t['status']}</span></div>
+            <div style="font-size:0.78rem;color:#8a8575;margin-top:4px">
+                Est. {t['prod_est']} sc/ha
+            </div>
+          </div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown('<div class="section-title">Clima · Palmital/SP</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">TEMPERATURA</div>
-            <div class="metric-value">{weather['temp_max']}°<span class="metric-unit">max</span></div>
-            <div style="font-size:0.78rem;color:#8a8880">{weather['temp_min']}° mínima</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">CHUVA</div>
-            <div class="metric-value">{weather['rain_mm']}<span class="metric-unit">mm</span></div>
-            <div style="font-size:0.78rem;color:#8a8880">{weather['humidity']:.0f}% umidade</div>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown(f"""
-    <div class="alert-card {'green' if weather['rain_mm'] < 5 else ''}">
-        <strong>Previsão:</strong> {weather['previsao']}
-        {'· Boas condições para operações de campo.' if weather['rain_mm'] < 5 else '· Atenção ao preparo do solo.'}
+    # Gráfico produção estimada
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">Produção estimada por mês (sacas)</div>', unsafe_allow_html=True)
+
+    fig2 = go.Figure()
+    cores_bar = {"Soja": "#4a8c3f", "Milho": "#c8a020", "Cana": "#4a7a9b", "Mandioca": "#9b6a3e"}
+    for crop, vals in prod_mensal.items():
+        fig2.add_trace(go.Bar(
+            name=crop, x=meses, y=vals,
+            marker_color=cores_bar.get(crop, "#888"),
+            marker_line_width=0,
+        ))
+    fig2.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        barmode="group",
+        margin=dict(l=0, r=0, t=10, b=0),
+        height=200,
+        bargap=0.25,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                    font=dict(size=11, color="#6a6560")),
+        xaxis=dict(showgrid=False, tickfont=dict(size=11, color="#aaa89f")),
+        yaxis=dict(showgrid=True, gridcolor="#f0ece3", tickfont=dict(size=10, color="#aaa89f")),
+        font=dict(family="DM Sans"),
+    )
+    st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ════ COLUNA DIREITA ════
+with col_dir:
+
+    # Alertas
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">Alertas e oportunidades</div>', unsafe_allow_html=True)
+    for a in ALERTAS:
+        st.markdown(f"""
+        <div class="alert-item">
+          <div class="alert-dot" style="background:{a['cor']}"></div>
+          <div class="alert-text">{a['texto']}</div>
+          <div class="alert-time">{a['hora']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Chat IA
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">Assistente IA · AgroData</div>', unsafe_allow_html=True)
+
+    # Chips de perguntas rápidas
+    st.markdown("""
+    <div style="margin-bottom:0.8rem;line-height:2.2">
+      <span class="chip" onclick="void(0)">Vale vender soja agora?</span>
+      <span class="chip">Risco de chuva no plantio?</span>
+      <span class="chip">Margem por hectare</span>
+      <span class="chip">Preço do milho esta semana</span>
     </div>
     """, unsafe_allow_html=True)
 
-    # Alerta de oportunidade
-    soja_delta = market["soja"]["atual"] - market["soja"]["ontem"]
-    if soja_delta > 0:
-        st.markdown(f"""
-        <div class="alert-card green">
-            <strong>Oportunidade:</strong> Soja em alta +{soja_delta:.2f}/sc hoje.
-            Preço atual ({market['soja']['atual']:.2f}) está acima da média recente.
-        </div>
-        """, unsafe_allow_html=True)
+    quick_cols = st.columns(2)
+    quick_qs = [
+        "Vale vender soja agora?",
+        "Risco de chuva no plantio?",
+        "Qual a margem por hectare?",
+        "Como está o preço do milho?",
+    ]
+    for i, q in enumerate(quick_qs):
+        with quick_cols[i % 2]:
+            if st.button(q, key=f"chip_{i}", use_container_width=True):
+                st.session_state._qinput = q
 
-# ── Coluna direita: chat IA ──────────────────────────────────
-with col_chat:
-    st.markdown('<div class="section-title">Assistente IA · Pergunte sobre seus dados</div>', unsafe_allow_html=True)
-
-    if not api_key:
-        st.info("Cole sua chave da API Claude na barra lateral para ativar o assistente.", icon="🔑")
+    # Histórico
+    chat_html = ""
+    if not st.session_state.messages:
+        primeiro_nome = owner.split()[0]
+        chat_html = f"""
+        <div class="chat-bubble-ai">
+          Olá, {primeiro_nome}! Sou o assistente da AgroData.<br>
+          Posso analisar preços, clima e situação dos seus talhões.<br>
+          <em>O que você quer saber hoje?</em>
+        </div>"""
     else:
-        # Renderiza histórico
-        chat_container = st.container(height=420)
-        with chat_container:
-            if not st.session_state.messages:
-                st.markdown(f"""
-                <div class="chat-msg-ai">
-                    Olá, {farm['produtor'].split()[0]}! 👋 Sou o assistente da AgroData Palmital.<br><br>
-                    Posso analisar os preços de hoje, clima e te ajudar a decidir sobre vendas e plantio.<br><br>
-                    <em>O que você quer saber?</em>
-                </div>
-                """, unsafe_allow_html=True)
+        for msg in st.session_state.messages:
+            if msg["role"] == "user":
+                chat_html += f'<div class="chat-name-user">Você</div><div class="chat-bubble-user">{msg["content"]}</div>'
+            else:
+                chat_html += f'<div class="chat-name-ai">AgroData IA</div><div class="chat-bubble-ai">{msg["content"]}</div>'
 
-            for msg in st.session_state.messages:
-                if msg["role"] == "user":
-                    st.markdown(f'<div class="chat-label-user">Você</div><div class="chat-msg-user">{msg["content"]}</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="chat-label-ai">AgroData IA</div><div class="chat-msg-ai">{msg["content"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="chat-history">{chat_html}</div>', unsafe_allow_html=True)
 
-        # Input do chat
-        user_input = st.chat_input("Digite sua pergunta sobre mercado, clima ou produção...")
+    # Input
+    user_input = st.chat_input("Pergunte sobre mercado, clima ou seus talhões...")
 
-        # Pergunta rápida via botão da sidebar
-        if hasattr(st.session_state, "_quick_q"):
-            user_input = st.session_state._quick_q
-            del st.session_state._quick_q
+    if hasattr(st.session_state, "_qinput"):
+        user_input = st.session_state._qinput
+        del st.session_state._qinput
 
-        if user_input:
-            st.session_state.messages.append({"role": "user", "content": user_input})
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
 
-            # Monta contexto com dados reais
-            m = market
-            w = weather
-            context = f"""
-Dados atuais da plataforma AgroData Palmital:
-Data: {date.today().strftime('%d/%m/%Y')}
+        p = precos
+        c = clima
+        context = f"""
+Dados da plataforma AgroData Palmital — {date.today().strftime('%d/%m/%Y')}
 
-Fazenda: {farm['nome']}
-Produtor: {farm['produtor']}
-Área: {farm['ha']} hectares
-Culturas: {', '.join(farm['culturas'])}
+Fazenda: {farm} | Produtor: {owner} | {hectares} ha | Culturas: {', '.join(crops)}
 
-Preços de mercado hoje (CEPEA/ESALQ):
-- Soja: R$ {m['soja']['atual']:.2f}/sc 60kg (ontem: R$ {m['soja']['ontem']:.2f}, variação: {((m['soja']['atual']-m['soja']['ontem'])/m['soja']['ontem']*100):+.1f}%)
-- Milho: R$ {m['milho']['atual']:.2f}/sc 60kg (ontem: R$ {m['milho']['ontem']:.2f}, variação: {((m['milho']['atual']-m['milho']['ontem'])/m['milho']['ontem']*100):+.1f}%)
-- Cana: R$ {m['cana']['atual']:.2f}/tonelada (ontem: R$ {m['cana']['ontem']:.2f})
+Preços hoje (CEPEA):
+- Soja:  R$ {p['soja']['atual']:.2f}/sc 60kg  (var: {((p['soja']['atual']-p['soja']['ontem'])/p['soja']['ontem']*100):+.1f}%)
+- Milho: R$ {p['milho']['atual']:.2f}/sc 60kg (var: {((p['milho']['atual']-p['milho']['ontem'])/p['milho']['ontem']*100):+.1f}%)
+- Cana:  R$ {p['cana']['atual']:.2f}/ton      (var: {((p['cana']['atual']-p['cana']['ontem'])/p['cana']['ontem']*100):+.1f}%)
 
-Clima Palmital/SP hoje:
-- Temperatura: {w['temp_max']}°C máx / {w['temp_min']}°C mín
-- Chuva: {w['rain_mm']}mm
-- Umidade: {w['humidity']:.0f}%
-- Previsão: {w['previsao']}
-"""
-            system_prompt = f"""Você é o assistente agrícola da AgroData Palmital.
-Responda de forma direta, prática e amigável — como um consultor de confiança para um produtor rural do interior de SP.
-Use os dados fornecidos para dar respostas concretas com números.
-Seja conciso (máximo 4 linhas por resposta). Português brasileiro.
-Não invente dados além do contexto.
+Clima Palmital: {c['max']}°C máx / {c['min']}°C mín | {c['chuva']}mm chuva | {c['umidade']}% umidade | {c['prev']}
+
+Talhões:
+""" + "\n".join(
+    f"- {t['nome']}: {t['ha']} ha, {t['status']}, estimativa {t['prod_est']} sc/ha"
+    for t in talhoes
+)
+
+        system = f"""Você é o assistente agrícola da AgroData Palmital.
+Responda de forma direta, prática e amigável — como um consultor para produtor rural do interior de SP.
+Use os dados abaixo para dar respostas concretas com números reais.
+Seja conciso (máximo 4 linhas). Português brasileiro coloquial.
+Não invente dados além do contexto fornecido.
 
 {context}"""
 
+        if not api_key:
+            reply = "⚠️ Chave da API não configurada. Configure ANTHROPIC_API_KEY nos Secrets do Streamlit Cloud."
+        else:
             try:
                 client = anthropic.Anthropic(api_key=api_key)
-                history = [
-                    {"role": h["role"], "content": h["content"]}
-                    for h in st.session_state.messages[:-1]
-                ][-10:]
-                history.append({"role": "user", "content": user_input})
-
-                with st.spinner("Analisando..."):
-                    response = client.messages.create(
+                hist = [{"role": h["role"], "content": h["content"]}
+                        for h in st.session_state.messages[:-1]][-10:]
+                hist.append({"role": "user", "content": user_input})
+                with st.spinner(""):
+                    resp = client.messages.create(
                         model="claude-sonnet-4-20250514",
                         max_tokens=512,
-                        system=system_prompt,
-                        messages=history,
+                        system=system,
+                        messages=hist,
                     )
-                reply = response.content[0].text
-                st.session_state.messages.append({"role": "assistant", "content": reply})
-                st.rerun()
-
+                reply = resp.content[0].text
             except Exception as e:
-                err = str(e)
-                if "api_key" in err.lower() or "authentication" in err.lower():
-                    st.error("Chave API inválida. Verifique em console.anthropic.com")
-                else:
-                    st.error(f"Erro: {err}")
+                reply = f"Erro na API: {str(e)[:120]}"
+
+        st.session_state.messages.append({"role": "assistant", "content": reply})
+        st.rerun()
+
+    if st.session_state.messages:
+        if st.button("Limpar conversa", key="clear_chat"):
+            st.session_state.messages = []
+            st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
