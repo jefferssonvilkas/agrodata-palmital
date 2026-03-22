@@ -371,8 +371,8 @@ Não invente dados além do contexto.
             try:
                 client = anthropic.Anthropic(api_key=api_key)
                 history = [
-                    {"role": m["role"], "content": m["content"]}
-                    for m in st.session_state.messages[:-1]
+                    {"role": h["role"], "content": h["content"]}
+                    for h in st.session_state.messages[:-1]
                 ][-10:]
                 history.append({"role": "user", "content": user_input})
 
